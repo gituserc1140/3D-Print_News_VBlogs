@@ -1,0 +1,42 @@
+name: Daily 3D Print Blog
+
+on:
+  schedule:
+    - cron: "0 12 * * *" # 12:00 UTC daily
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  blog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate blog
+        env:
+          COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+        run: python scripts/generate_blog.py
+
+      - name: Commit blog
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add blogs
+          git commit -m "Add daily blog $(date -u +%F)"
+          git push
+
+      - name: Open issue (triggers email)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --title "3D Print News Blog - $(date -u +%F)" \
+            --body-file issue_body.md \
+            --assignee "${{ github.repository_owner }}"

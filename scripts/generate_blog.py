@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 FEED = "https://news.google.com/rss/search?" + urllib.parse.urlencode(
     {"q": "3D printing when:1d", "hl": "en-US", "gl": "US", "ceid": "US:en"}
 )
-MODEL = os.environ.get("COHERE_MODEL", "command-a-03-2025")
+MODEL = os.environ.get("COHERE_MODEL", "command-r-plus-08-2024")
 
 
 def fetch_headlines(limit=25):
@@ -32,14 +32,18 @@ def cohere_chat(prompt):
     req = urllib.request.Request(
         "https://api.cohere.com/v2/chat",
         data=json.dumps(
-            {"model": MODEL, "messages": [{"role": "user", "content": prompt}]}
+            {
+                "model": MODEL,
+                "max_tokens": 1500,
+                "messages": [{"role": "user", "content": prompt}],
+            }
         ).encode(),
         headers={
             "Authorization": f"Bearer {os.environ['COHERE_API_KEY']}",
             "Content-Type": "application/json",
         },
     )
-    with urllib.request.urlopen(req, timeout=120) as r:
+    with urllib.request.urlopen(req, timeout=300) as r:
         data = json.load(r)
     return data["message"]["content"][0]["text"]
 

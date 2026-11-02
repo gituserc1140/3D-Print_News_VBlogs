@@ -19,6 +19,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install dependencies
+        run: pip install googlenewsdecoder
+
       - name: Generate blog
         env:
           COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}

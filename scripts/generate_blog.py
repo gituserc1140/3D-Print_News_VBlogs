@@ -4,6 +4,7 @@ import os
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+from html.parser import HTMLParser
 
 FEED = "https://news.google.com/rss/search?" + urllib.parse.urlencode(
     {"q": "3D printing when:1d", "hl": "en-US", "gl": "US", "ceid": "US:en"}
@@ -28,13 +29,57 @@ def fetch_headlines(limit=25):
     return items
 
 
+class ParagraphParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.in_p = False
+        self.skip = 0
+        self.paras = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("script", "style", "nav", "footer"):
+            self.skip += 1
+        elif tag == "p" and not self.skip:
+            self.in_p = True
+            self.paras.append("")
+
+    def handle_endtag(self, tag):
+        if tag in ("script", "style", "nav", "footer"):
+            self.skip = max(0, self.skip - 1)
+        elif tag == "p":
+            self.in_p = False
+
+    def handle_data(self, data):
+        if self.in_p:
+            self.paras[-1] += data
+
+
+def fetch_article(google_link, max_chars=6000):
+    """Return (real_url, text); text is empty if the page can't be read."""
+    try:
+        from googlenewsdecoder import gnewsdecoder
+
+        decoded = gnewsdecoder(google_link, interval=1)
+        url = decoded.get("decoded_url") if decoded.get("status") else google_link
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            html = r.read().decode("utf-8", errors="ignore")
+        parser = ParagraphParser()
+        parser.feed(html)
+        text = "\n\n".join(p.strip() for p in parser.paras if len(p.strip()) > 60)
+        return url, text[:max_chars]
+    except Exception as e:
+        print(f"Article fetch failed: {e}")
+        return google_link, ""
+
+
 def cohere_chat(prompt):
     req = urllib.request.Request(
         "https://api.cohere.com/v2/chat",
         data=json.dumps(
             {
                 "model": MODEL,
-                "max_tokens": 1500,
+                "max_tokens": 2000,
                 "messages": [{"role": "user", "content": prompt}],
             }
         ).encode(),
@@ -63,12 +108,15 @@ def main():
     idx = int(digits) - 1 if digits else 0
     item = items[idx] if 0 <= idx < len(items) else items[0]
 
+    url, article = fetch_article(item["link"])
     post = cohere_chat(
-        "Write an engaging blog post in Markdown about this one news story only, "
-        "with a title (H1), a short intro, and a few short sections. Do not "
-        "mention any other stories. Use only facts in the headline; do not invent "
-        "quotes or numbers. End with a link to the source.\n\n"
-        f"Headline: {item['title']}\nSource: {item['source']}\nLink: {item['link']}"
+        "Write an engaging, positive blog post of 400-600 words in Markdown about "
+        "this one news story only, with a title (H1), a short intro, and a few "
+        "sections. Do not mention other stories. Use only facts from the headline "
+        "and article text below; do not invent quotes or numbers. End with a link "
+        "to the source.\n\n"
+        f"Headline: {item['title']}\nSource: {item['source']}\nLink: {url}\n\n"
+        f"Article text:\n{article or '(unavailable; rely on the headline only)'}"
     )
 
     os.makedirs("blogs", exist_ok=True)

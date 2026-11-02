@@ -53,19 +53,23 @@ def main():
     items = fetch_headlines()
     if not items:
         raise SystemExit("No headlines found")
-    listing = "\n".join(
-        f"- {i['title']} ({i['source']}) {i['link']}" for i in items
+    listing = "\n".join(f"{n}. {i['title']}" for n, i in enumerate(items, 1))
+    pick = cohere_chat(
+        "Below are numbered Google News headlines about 3D printing. Choose the "
+        "single most positive, uplifting one (breakthrough, launch, helpful "
+        "application). Reply with only its number.\n\n" + listing
     )
-    prompt = (
-        "Below are today's Google News headlines about 3D printing.\n"
-        "Pick the single most positive, uplifting story (breakthrough, launch, "
-        "helpful application). Ignore negative or controversial ones. Write an "
-        "engaging blog post in Markdown about only that story, with a title (H1), "
-        "a short intro, a few short sections, and a link to the source article at "
-        "the end. Use only facts present in the headline; do not invent details "
-        "such as quotes or numbers.\n\n" + listing
+    digits = "".join(c for c in pick if c.isdigit())
+    idx = int(digits) - 1 if digits else 0
+    item = items[idx] if 0 <= idx < len(items) else items[0]
+
+    post = cohere_chat(
+        "Write an engaging blog post in Markdown about this one news story only, "
+        "with a title (H1), a short intro, and a few short sections. Do not "
+        "mention any other stories. Use only facts in the headline; do not invent "
+        "quotes or numbers. End with a link to the source.\n\n"
+        f"Headline: {item['title']}\nSource: {item['source']}\nLink: {item['link']}"
     )
-    post = cohere_chat(prompt)
 
     os.makedirs("blogs", exist_ok=True)
     path = f"blogs/{today}.md"

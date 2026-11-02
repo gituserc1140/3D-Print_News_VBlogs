@@ -58,11 +58,12 @@ def main():
     )
     prompt = (
         "Below are today's Google News headlines about 3D printing.\n"
-        "Pick the 3-5 most positive, uplifting stories (breakthroughs, launches, "
-        "helpful applications). Ignore negative or controversial ones. Write an "
-        "engaging blog post in Markdown with a title (H1), a short intro, a section "
-        "per story, and a link to each source article. Use only facts present in the "
-        "headlines; do not invent details.\n\n" + listing
+        "Pick the single most positive, uplifting story (breakthrough, launch, "
+        "helpful application). Ignore negative or controversial ones. Write an "
+        "engaging blog post in Markdown about only that story, with a title (H1), "
+        "a short intro, a few short sections, and a link to the source article at "
+        "the end. Use only facts present in the headline; do not invent details "
+        "such as quotes or numbers.\n\n" + listing
     )
     post = cohere_chat(prompt)
 
